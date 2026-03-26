@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import AdvisorHub from '@/components/AdvisorHub';
 
 test('renders option cards and roadmap', () => {

@@ -77,7 +77,10 @@ export default function AssumptionsDrawer({
       let originalValue: any = rules[key as keyof Rules]
       if (key.includes('.')) {
         const [parent, child] = key.split('.')
-        originalValue = rules[parent as keyof Rules]?.[child as any]
+        const parentValue = (rules as any)[parent]
+        if (typeof parentValue === 'object' && parentValue !== null) {
+          originalValue = parentValue[child]
+        }
       }
       if (originalValue !== value) {
         newChanged.add(key)
