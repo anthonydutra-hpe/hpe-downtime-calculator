@@ -1,0 +1,13 @@
+{
+  "highVmCount": 250,
+  "smallMissionCriticalRatio": 0.10,
+  "smallMissionCriticalMin": 10,
+  "largeDataFootprintTB": 500,
+  "tightRTOFor50": 1,
+  "tightRTOFor250": 4,
+  "restoreAssumptions": {
+    "backupRestoreTBPerHour": 1.5,
+    "snapshotRTOHours": 0.1,
+    "achievableBackupRPOHours": 4
+  }
+}
