@@ -59,7 +59,6 @@ export default function AdvisorHub({
     );
 
   const handleSimulate = async (optionCode: string) => {
-    setSimulateOption(null);
     setIsSimulating(true);
     try {
       const result = await runSimulation(optionCode, inputs);
