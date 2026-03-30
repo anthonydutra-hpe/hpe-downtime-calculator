@@ -1,27 +1,39 @@
 'use client'
 import React from 'react'
 import { useState } from 'react'
-import { formatCurrency, parseCurrency } from '@/lib/formatting'
+import { formatCurrency, parseCurrency, formatNumber, parseInteger } from '@/lib/formatting'
 
 interface InputFormProps {
   value: any
   onChange: (values: any) => void
 }
 
-// USD fields that should display formatted currency
-const USD_FIELDS = {
+// Fields that display as formatted currency with $ symbol
+const CURRENCY_FIELDS = {
   annualRevenue: { fractionDigits: 0 },
   lostRevenuePerHour: { fractionDigits: 0 },
-  employees: { fractionDigits: 0 },
   avgHourlySalary: { fractionDigits: 2 },
 }
+
+// Fields that display as grouped integers (no currency symbol)
+const INTEGER_GROUPED_FIELDS = new Set(['employees'])
 
 export default function InputForm({ value, onChange }: InputFormProps) {
   const [errors, setErrors] = useState<any>({})
   const [editingField, setEditingField] = useState<string | null>(null)
 
   const set = (k: string, v: any) => {
-    const finalValue = v === '' ? null : (k === 'industry' ? v : Number(v))
+    let finalValue
+    if (v === '') {
+      finalValue = null
+    } else if (k === 'industry') {
+      finalValue = v
+    } else if (typeof v === 'string') {
+      // For string inputs, parse them to remove formatting (e.g., commas)
+      finalValue = parseInteger(v)
+    } else {
+      finalValue = v
+    }
     onChange({ ...value, [k]: finalValue })
     // Clear error for this field when user starts typing
     if (errors[k]) {
@@ -35,8 +47,11 @@ export default function InputForm({ value, onChange }: InputFormProps) {
 
   const handleFieldBlur = (key: string, inputStr: string) => {
     setEditingField(null)
-    if (key in USD_FIELDS) {
+    if (key in CURRENCY_FIELDS) {
       const parsed = parseCurrency(inputStr)
+      set(key, parsed === null ? '' : parsed)
+    } else if (INTEGER_GROUPED_FIELDS.has(key)) {
+      const parsed = parseInteger(inputStr)
       set(key, parsed === null ? '' : parsed)
     }
   }
@@ -46,9 +61,12 @@ export default function InputForm({ value, onChange }: InputFormProps) {
       // While editing, show unformatted number
       return numericValue === null ? '' : String(numericValue)
     }
-    // When not editing, show formatted currency
-    if (key in USD_FIELDS) {
-      return formatCurrency(numericValue, { fractionDigits: (USD_FIELDS as any)[key].fractionDigits })
+    // When not editing, show formatted based on field type
+    if (key in CURRENCY_FIELDS) {
+      return formatCurrency(numericValue, { fractionDigits: (CURRENCY_FIELDS as any)[key].fractionDigits })
+    }
+    if (INTEGER_GROUPED_FIELDS.has(key)) {
+      return formatNumber(numericValue)
     }
     return numericValue === null ? '' : String(numericValue)
   }
