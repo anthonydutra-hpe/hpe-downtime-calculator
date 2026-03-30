@@ -233,4 +233,146 @@ describe('AdvisorHub Content Rendering', () => {
     render(<AdvisorHub inputs={mockInputs} calc={mockCalc} advice={mockAdvice} />);
     expect(screen.getByText(/Balanced/)).toBeInTheDocument();
   });
+
+  describe('sanitizes rule-like rationales in UI', () => {
+    test('never displays raw rule text like "hasVMs === true" in option card summary', () => {
+      const ruleAdvice = {
+        ...mockAdvice,
+        recommendedProducts: [
+          {
+            code: 'Option A',
+            name: 'HPE StoreOnce',
+            rationale: 'VM protection; included because hasVMs === true',
+            confidence: 85,
+            estAnnualCostAvoided: 200000,
+          },
+        ],
+      };
+
+      render(<AdvisorHub inputs={mockInputs} calc={mockCalc} advice={ruleAdvice} />);
+
+      // The rationale string should NOT appear in the visible text
+      expect(screen.queryByText(/hasVMs === true/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/included because hasVMs/)).not.toBeInTheDocument();
+
+      // But friendly text should appear
+      const summaryTexts = screen.getAllByText(/What it fixes:/);
+      const summaryText = summaryTexts[0].closest('.text-xs')?.textContent || '';
+      expect(summaryText.toLowerCase()).toMatch(
+        /virtual machines|vms|protect|protection/
+      );
+    });
+
+    test('sanitizes rule operators and boolean values from visible text', () => {
+      const ruleAdvice = {
+        ...mockAdvice,
+        recommendedProducts: [
+          {
+            code: 'Option B',
+            name: 'Zerto Replication',
+            rationale: 'rtoGap === true && vmCountHigh === true',
+            confidence: 90,
+            estAnnualCostAvoided: 350000,
+          },
+        ],
+      };
+
+      const { container } = render(
+        <AdvisorHub inputs={mockInputs} calc={mockCalc} advice={ruleAdvice} />
+      );
+
+      const allText = container.textContent || '';
+      // Should not leak rule syntax into visible content
+      expect(allText).not.toContain('===');
+      expect(allText).not.toContain('&&');
+      expect(allText).not.toContain('rtoGap');
+      expect(allText).not.toContain(' true ');
+    });
+
+    test('displays friendly text in "What it fixes" bullet even with code-like rationale', () => {
+      const ruleAdvice = {
+        ...mockAdvice,
+        options: [
+          {
+            code: 'Option D',
+            name: 'Cyber Resilience Vault',
+          },
+        ],
+        recommendedProducts: [
+          {
+            code: 'Option D',
+            name: 'Cyber Resilience Vault',
+            rationale: 'immutability === true || airgap === true',
+            confidence: 95,
+            estAnnualCostAvoided: 500000,
+          },
+        ],
+      };
+
+      render(<AdvisorHub inputs={mockInputs} calc={mockCalc} advice={ruleAdvice} />);
+
+      // Find the "What it fixes" section
+      const whatItFixesTexts = screen.getAllByText(/What it fixes:/);
+      const whatItFixesText = whatItFixesTexts[0].closest('.text-xs')?.textContent || '';
+
+      // Should have friendly language about immutability or air-gap
+      expect(whatItFixesText.toLowerCase()).toMatch(
+        /immut|air|gap|compliance|ransomware/
+      );
+
+      // Should NOT have code operators or boolean literals
+      expect(whatItFixesText).not.toContain('===');
+      expect(whatItFixesText).not.toContain('||');
+      expect(whatItFixesText).not.toContain(' true');
+      expect(whatItFixesText).not.toContain(' false');
+    });
+
+    test('keeps technical details in collapsed section untouched', () => {
+      const ruleAdvice = {
+        ...mockAdvice,
+        decisionTrace: [
+          {
+            rule: 'hasVMs === true',
+            evaluatedTo: true,
+            details: 'Environment contains VMs',
+          },
+        ],
+      };
+
+      render(<AdvisorHub inputs={mockInputs} calc={mockCalc} advice={ruleAdvice} />);
+
+      // Open roadmap
+      fireEvent.click(screen.getAllByLabelText(/View roadmap for/)[0]);
+
+      // Expand technical details
+      fireEvent.click(screen.getByText(/Show technical rationale/));
+
+      // Raw rule text SHOULD appear in the collapsed technical section
+      // (This is intentional — engineers can view the raw rules there)
+      expect(screen.getByText(/hasVMs === true/)).toBeInTheDocument();
+    });
+
+    test('renders clean, non-code rationales unchanged in UI', () => {
+      const cleanAdvice = {
+        ...mockAdvice,
+        recommendedProducts: [
+          {
+            code: 'Option A',
+            name: 'HPE StoreOnce',
+            rationale: 'Provides efficient backup with deduplication.',
+            confidence: 85,
+            estAnnualCostAvoided: 200000,
+          },
+        ],
+      };
+
+      render(<AdvisorHub inputs={mockInputs} calc={mockCalc} advice={cleanAdvice} />);
+
+      // Clean rationale should appear as-is (might be truncated if long)
+      const allWhatItFixes = screen.getAllByText(/What it fixes:/);
+      const cleanText = allWhatItFixes[0].closest('.text-xs')?.textContent || '';
+      expect(cleanText).toContain('Provides efficient backup with deduplication');
+    });
+  });
 });
+

@@ -1,5 +1,142 @@
 import { formatCurrency } from '@/lib/formatting'
 
+/* ========================================
+   Helpers to detect and sanitize code-like or rule-based strings
+   ======================================== */
+
+/**
+ * Check if a string looks like code or a rule (contains ===, ==, true, false, variable names, etc.)
+ */
+function looksLikeCodeOrRule(s?: string): boolean {
+  if (!s || typeof s !== 'string') return false
+  const codePatterns = [
+    /===|==|!==|!=|>=|<=|>|</,  // comparison operators
+    /\btrue\b|\bfalse\b/,       // boolean literals
+    /\bhasVMs\b/,               // VM flag variable
+    /\bvmCount\b/,              // VM count variable
+    /\brtoGap\b|\brpoGap\b/,    // gap variables
+    /\bimmut|airgap|Immutability|air-gap/i, // immutability/airgap keywords
+    /\bthreshold\b|\brule\b/,   // technical terms
+    /\bdataLarge\b|\bdataFootprint\b/i, // data size variables
+  ]
+  return codePatterns.some((rx) => rx.test(s))
+}
+
+/**
+ * Map technical token to a friendly English phrase
+ */
+function tokenMapToFriendly(token: string): string {
+  const t = String(token).toLowerCase()
+  // Check for exact token names (avoid broad substring matches)
+  if (t === 'hasvms') {
+    return 'The environment contains virtual machines that require protection.'
+  }
+  if (t === 'vmcounthigh' || t === 'vmcount') {
+    return 'Large VM count — recommend scale-capable protection.'
+  }
+  if (t.includes('immut') || t.includes('airgap')) {
+    return 'Requires immutability or air-gap controls for compliance and ransomware protection.'
+  }
+  if (t === 'rtogap' || t === 'rto') {
+    return 'Target RTO is tighter than estimated restore time; consider DR tooling to meet objectives.'
+  }
+  if (t === 'rpogap' || t === 'rpo') {
+    return 'Target RPO is tighter than backup cadence; consider continuous replication options.'
+  }
+  if (t === 'datalarge' || t === 'data' || t.includes('footprint')) {
+    return 'Large data footprint — high-throughput storage and consolidation recommended.'
+  }
+  return ''
+}
+
+/**
+ * Generate a fallback friendly rationale based on option, flags, and inputs
+ */
+function generateFallbackRationale(option: any, flags: string[] = [], inputs: any = {}): string {
+  const baseByOption: Record<string, string> = {
+    'Option A': 'Protect a focused set of mission-critical VMs and enable fast snapshot-based recovery.',
+    'Option B': 'Provide a Zerto-centric DR solution for tight RTO/RPO and large VM scale.',
+    'Option C': 'Deliver high-throughput, TB–PB-scale protection with enterprise storage.',
+    'Option D': 'Implement an immutable, air-gapped resilience vault for compliance and cyber resilience.',
+  }
+  const base =
+    baseByOption[option?.code] ||
+    (option?.name ? `Adopt ${option.name} to improve recoverability.` : 'Improve recoverability and reduce downtime.')
+  const flagNote = flags && flags.length ? ` Addresses: ${flags.slice(0, 2).join('; ')}.` : ''
+  return (base + flagNote).slice(0, 120)
+}
+
+/**
+ * Sanitize rationale: detect code-like strings and replace with friendly English.
+ * If the original rationale is clean, lightly clean it up and return.
+ * Otherwise, fall back to a generated friendly rationale.
+ */
+export function sanitizeRationale(
+  raw?: string,
+  option?: any,
+  flags: string[] = [],
+  inputs?: any
+): string {
+  const s = typeof raw === 'string' ? raw.trim() : ''
+  
+  if (!s) {
+    return generateFallbackRationale(option, flags, inputs)
+  }
+
+  // If it looks like code or a rule, try to map known tokens to friendly sentences
+  if (looksLikeCodeOrRule(s)) {
+    const tokensFound: string[] = []
+    
+    // Check for known tokens and map them to friendly phrases
+    if (/\bhasVMs\b/i.test(s)) {
+      tokensFound.push(tokenMapToFriendly('hasVMs'))
+    }
+    if (/\bvmCount\b/i.test(s) || /\bvmCountHigh\b/i.test(s)) {
+      tokensFound.push(tokenMapToFriendly('vmCountHigh'))
+    }
+    if (/\bimmut|airgap|immutability/i.test(s)) {
+      tokensFound.push(tokenMapToFriendly('immutOrAirgap'))
+    }
+    if (/\brtoGap\b|\brto\b/i.test(s)) {
+      tokensFound.push(tokenMapToFriendly('rtoGap'))
+    }
+    if (/\brpoGap\b|\brpo\b/i.test(s)) {
+      tokensFound.push(tokenMapToFriendly('rpoGap'))
+    }
+    if (/\bdataFootprint\b|\bdataLarge\b|\bTB\b/i.test(s)) {
+      tokensFound.push(tokenMapToFriendly('dataLarge'))
+    }
+
+    const compact = tokensFound.filter(Boolean)
+    if (compact.length) {
+      // Join first two mapped phrases into one short sentence
+      return compact.slice(0, 2).join(' ')
+    }
+
+    // If we couldn't map tokens, fallback to generated rationale based on option & flags
+    return generateFallbackRationale(option, flags, inputs)
+  }
+
+  // Otherwise, clean up punctuation and trim overly verbose reason text
+  // Remove repeated "included because ..." patterns
+  let cleaned = s
+    .replace(/\bincluded because\b.*$/i, '')
+    .replace(/\bhasVMs\b/gi, 'virtual machines')
+    .replace(/\s+/g, ' ')
+    .trim()
+  
+  if (cleaned.length > 120) {
+    cleaned = cleaned.slice(0, 117).trim() + '…'
+  }
+  
+  // If the cleaned string still contains typical variable tokens, fallback
+  if (looksLikeCodeOrRule(cleaned)) {
+    return generateFallbackRationale(option, flags, inputs)
+  }
+  
+  return cleaned.endsWith('.') ? cleaned : cleaned + '.'
+}
+
 /**
  * Convert technical option details into customer-friendly title, summary, and bullet points.
  */
@@ -12,20 +149,10 @@ export function summarizeOption(
 
   // Extract top recommendation and its benefit
   const topRec = recommendedProducts?.[0] || null
-  const summaryParts: string[] = []
-
-  if (topRec?.rationale) {
-    // Clean up the rationale to a concise benefit line
-    const cleaned = String(topRec.rationale)
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 120)
-    summaryParts.push(cleaned)
-  } else {
-    summaryParts.push('A focused approach to reduce downtime and improve recovery time.')
-  }
-
-  const summary = summaryParts[0]
+  const rawRationale = topRec?.rationale || ''
+  
+  // Sanitize the rationale to remove any code-like or rule-y strings
+  const summary = sanitizeRationale(rawRationale, option, flags)
 
   // Impact bullet: costs or requirements
   let impactBullet = 'Improves recoverability and operational efficiency.'
