@@ -2,8 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/formatting';
 import CostEstimateModal from './CostEstimateModal';
+import SimulationPanel from './SimulationPanel';
+import { runSimulation } from '@/helpers/simulation';
 
 type Advice = any;
+
+interface SimulationResult {
+  simulatedInputs: any;
+  simCalc: any;
+  simAdvice: any;
+  error?: string;
+}
 
 export default function AdvisorHub({
   inputs,
@@ -20,6 +29,8 @@ export default function AdvisorHub({
   const [simulateOption, setSimulateOption] = useState<string | null>(null);
   const [showCostEstimate, setShowCostEstimate] = useState(false);
   const [costEstimateOption, setCostEstimateOption] = useState<string | null>(null);
+  const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   // Listen for estimate cost events
   useEffect(() => {
@@ -46,6 +57,34 @@ export default function AdvisorHub({
     window.dispatchEvent(
       new CustomEvent('advisor:estimate', { detail: { optionCode: code } })
     );
+
+  const handleSimulate = async (optionCode: string) => {
+    setSimulateOption(null);
+    setIsSimulating(true);
+    try {
+      const result = await runSimulation(optionCode, inputs);
+      setSimulationResult(result);
+    } catch (error: any) {
+      setSimulationResult({
+        simulatedInputs: {},
+        simCalc: {},
+        simAdvice: {},
+        error: error?.message || 'Simulation failed',
+      });
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  const handleApplySimulation = () => {
+    if (simulationResult?.simulatedInputs && simulationResult?.simCalc) {
+      // Optional: Update main inputs with simulated ones
+      // This could trigger a re-calculation in the parent component
+      console.log('Apply simulation:', simulationResult.simulatedInputs);
+      // For now, just close the simulation panel
+      setSimulationResult(null);
+    }
+  };
 
   return (
     <section
@@ -135,13 +174,12 @@ export default function AdvisorHub({
                     Estimate Cost
                   </button>
                   <button
-                    onClick={() =>
-                      setSimulateOption(simulateOption === opt.code ? null : opt.code)
-                    }
+                    onClick={() => handleSimulate(opt.code)}
                     aria-label={`Simulate ${opt.code}`}
-                    className="px-3 py-1 rounded border border-gray-300 text-sm font-medium hover:bg-gray-50 transition"
+                    className="px-3 py-1 rounded border border-gray-300 text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50"
+                    disabled={isSimulating}
                   >
-                    Simulate
+                    {isSimulating ? 'Running...' : 'Simulate'}
                   </button>
                 </div>
               </article>
@@ -206,26 +244,19 @@ export default function AdvisorHub({
         </div>
       )}
 
-      {/* Simulation Overlay */}
-      {simulateOption && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white p-6 rounded shadow-lg max-w-md">
-            <h4 className="font-semibold text-lg">Simulation: {simulateOption}</h4>
-            <p className="text-sm text-gray-700 mt-3">
-              This is a simulation overlay for <strong>{simulateOption}</strong>. Replace
-              with real simulation logic later.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setSimulateOption(null)}
-                className="flex-1 px-3 py-2 rounded text-white font-medium transition hover:opacity-90"
-                style={{ background: '#00B388' }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Simulation Panel */}
+      {simulationResult && (
+        <SimulationPanel
+          currentCalc={calc}
+          currentAdvice={advice}
+          currentInputs={inputs}
+          simCalc={simulationResult.simCalc}
+          simAdvice={simulationResult.simAdvice}
+          simulatedInputs={simulationResult.simulatedInputs}
+          onApply={handleApplySimulation}
+          onClose={() => setSimulationResult(null)}
+          isApplying={false}
+        />
       )}
 
       {/* Cost Estimate Modal */}
