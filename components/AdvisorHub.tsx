@@ -1,6 +1,7 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/formatting';
+import CostEstimateModal from './CostEstimateModal';
 
 type Advice = any;
 
@@ -17,6 +18,23 @@ export default function AdvisorHub({
   const [showTimeline, setShowTimeline] = useState(false);
   const [showTrace, setShowTrace] = useState(false);
   const [simulateOption, setSimulateOption] = useState<string | null>(null);
+  const [showCostEstimate, setShowCostEstimate] = useState(false);
+  const [costEstimateOption, setCostEstimateOption] = useState<string | null>(null);
+
+  // Listen for estimate cost events
+  useEffect(() => {
+    const handleEstimateEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const optionCode = customEvent.detail?.optionCode;
+      if (optionCode) {
+        setCostEstimateOption(optionCode);
+        setShowCostEstimate(true);
+      }
+    };
+
+    window.addEventListener('advisor:estimate', handleEstimateEvent);
+    return () => window.removeEventListener('advisor:estimate', handleEstimateEvent);
+  }, []);
 
   if (!advice) return null;
 
@@ -37,7 +55,7 @@ export default function AdvisorHub({
     >
       <div className="flex items-center justify-between mb-4">
         <h2 id="advisor-heading" className="text-lg font-semibold">
-          AI Roadmap Recommendation
+          Roadmap Recommendation
         </h2>
         <div
           className="px-3 py-1 rounded-full text-sm font-medium"
@@ -208,6 +226,19 @@ export default function AdvisorHub({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Cost Estimate Modal */}
+      {showCostEstimate && costEstimateOption && (
+        <CostEstimateModal
+          optionCode={costEstimateOption}
+          vmCount={inputs.vmCount || 0}
+          dataFootprintTB={inputs.dataFootprintTB || 0}
+          onClose={() => {
+            setShowCostEstimate(false);
+            setCostEstimateOption(null);
+          }}
+        />
       )}
     </section>
   );

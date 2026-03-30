@@ -29,3 +29,15 @@ describe('formatCurrency', () => {
     expect(formatCurrency(50000)).toBe('$50,000')
   })
 })
+
+describe('formatCurrency with fraction digits', () => {
+  test('formats with 2 fraction digits', () => {
+    const { formatCurrency } = require('../lib/formatting')
+    expect(formatCurrency(50.5, { fractionDigits: 2 })).toBe('$50.50')
+  })
+
+  test('formats with 0 fraction digits', () => {
+    const { formatCurrency } = require('../lib/formatting')
+    expect(formatCurrency(50.99, { fractionDigits: 0 })).toBe('$51')
+  })
+})

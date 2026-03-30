@@ -1,21 +1,56 @@
 'use client'
 import React from 'react'
 import { useState } from 'react'
+import { formatCurrency, parseCurrency } from '@/lib/formatting'
 
 interface InputFormProps {
   value: any
   onChange: (values: any) => void
 }
 
+// USD fields that should display formatted currency
+const USD_FIELDS = {
+  annualRevenue: { fractionDigits: 0 },
+  lostRevenuePerHour: { fractionDigits: 0 },
+  employees: { fractionDigits: 0 },
+  avgHourlySalary: { fractionDigits: 2 },
+}
+
 export default function InputForm({ value, onChange }: InputFormProps) {
   const [errors, setErrors] = useState<any>({})
+  const [editingField, setEditingField] = useState<string | null>(null)
 
   const set = (k: string, v: any) => {
-    onChange({ ...value, [k]: v === '' ? null : (k === 'industry' ? v : Number(v)) })
+    const finalValue = v === '' ? null : (k === 'industry' ? v : Number(v))
+    onChange({ ...value, [k]: finalValue })
     // Clear error for this field when user starts typing
     if (errors[k]) {
       setErrors({ ...errors, [k]: '' })
     }
+  }
+
+  const handleFieldFocus = (key: string) => {
+    setEditingField(key)
+  }
+
+  const handleFieldBlur = (key: string, inputStr: string) => {
+    setEditingField(null)
+    if (key in USD_FIELDS) {
+      const parsed = parseCurrency(inputStr)
+      set(key, parsed === null ? '' : parsed)
+    }
+  }
+
+  const getDisplayValue = (key: string, numericValue: number | null): string => {
+    if (editingField === key) {
+      // While editing, show unformatted number
+      return numericValue === null ? '' : String(numericValue)
+    }
+    // When not editing, show formatted currency
+    if (key in USD_FIELDS) {
+      return formatCurrency(numericValue, { fractionDigits: (USD_FIELDS as any)[key].fractionDigits })
+    }
+    return numericValue === null ? '' : String(numericValue)
   }
 
   return (
@@ -23,20 +58,33 @@ export default function InputForm({ value, onChange }: InputFormProps) {
       <h2 className="font-semibold mb-2">Inputs</h2>
       <label className="block text-sm">Annual revenue (USD)</label>
       <input
-        type="number"
-        placeholder="100000000"
-        value={value.annualRevenue === null ? '' : value.annualRevenue}
-        onChange={e => set('annualRevenue', e.target.value)}
+        type="text"
+        placeholder="e.g. 100000000"
+        value={getDisplayValue('annualRevenue', value.annualRevenue)}
+        onFocus={() => handleFieldFocus('annualRevenue')}
+        onBlur={(e) => handleFieldBlur('annualRevenue', e.target.value)}
+        onChange={(e) => {
+          if (editingField === 'annualRevenue') {
+            // Allow any input while editing; sanitize on blur
+            set('annualRevenue', e.target.value)
+          }
+        }}
         className="w-full p-2 border rounded mb-2"
       />
       {errors.annualRevenue && <p className="text-red-500 text-xs mb-2">{errors.annualRevenue}</p>}
       
       <label className="block text-sm">Lost revenue per hour (optional)</label>
       <input
-        type="number"
-        placeholder="10000"
-        value={value.lostRevenuePerHour === null ? '' : value.lostRevenuePerHour}
-        onChange={e => set('lostRevenuePerHour', e.target.value)}
+        type="text"
+        placeholder="e.g. 10000"
+        value={getDisplayValue('lostRevenuePerHour', value.lostRevenuePerHour)}
+        onFocus={() => handleFieldFocus('lostRevenuePerHour')}
+        onBlur={(e) => handleFieldBlur('lostRevenuePerHour', e.target.value)}
+        onChange={(e) => {
+          if (editingField === 'lostRevenuePerHour') {
+            set('lostRevenuePerHour', e.target.value)
+          }
+        }}
         className="w-full p-2 border rounded mb-2"
       />
       
@@ -147,19 +195,31 @@ export default function InputForm({ value, onChange }: InputFormProps) {
       
       <label className="block text-sm">Employees</label>
       <input
-        type="number"
-        placeholder="1000"
-        value={value.employees === null ? '' : value.employees}
-        onChange={e => set('employees', e.target.value)}
+        type="text"
+        placeholder="e.g. 1000"
+        value={getDisplayValue('employees', value.employees)}
+        onFocus={() => handleFieldFocus('employees')}
+        onBlur={(e) => handleFieldBlur('employees', e.target.value)}
+        onChange={(e) => {
+          if (editingField === 'employees') {
+            set('employees', e.target.value)
+          }
+        }}
         className="w-full p-2 border rounded mb-2"
       />
       
       <label className="block text-sm">Avg hourly salary (USD)</label>
       <input
-        type="number"
-        placeholder="50"
-        value={value.avgHourlySalary === null ? '' : value.avgHourlySalary}
-        onChange={e => set('avgHourlySalary', e.target.value)}
+        type="text"
+        placeholder="e.g. 50"
+        value={getDisplayValue('avgHourlySalary', value.avgHourlySalary)}
+        onFocus={() => handleFieldFocus('avgHourlySalary')}
+        onBlur={(e) => handleFieldBlur('avgHourlySalary', e.target.value)}
+        onChange={(e) => {
+          if (editingField === 'avgHourlySalary') {
+            set('avgHourlySalary', e.target.value)
+          }
+        }}
         className="w-full p-2 border rounded mb-2"
       />
     </div>
