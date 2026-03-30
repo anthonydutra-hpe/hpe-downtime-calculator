@@ -7,50 +7,58 @@ test('renders option cards and roadmap', () => {
   const advice = {
     path: 'accelerated',
     options: [
-      { code: 'Option A', name: 'Opt A' },
-      { code: 'Option B', name: 'Opt B' },
+      { code: 'Option A', name: 'VM Backup' },
+      { code: 'Option B', name: 'Zerto DR' },
     ],
     recommendedProducts: [
       {
-        name: 'Opt A',
+        code: 'Option A',
+        name: 'VM Protection',
         rationale: 'protect VMs',
         confidence: 90,
         estAnnualCostAvoided: 500000,
       },
     ],
-    roadmap: { years: ['y1', 'y2', 'y3', 'y4', 'y5'] },
+    roadmap: { years: ['Deploy infrastructure', 'Scale out', 'Optimize', 'Migrate', 'Plan upgrade'] },
     decisionTrace: [{ rule: 'hasVMs', evaluatedTo: true }],
   };
 
   render(React.createElement(AdvisorHub, { inputs: {}, calc: {}, advice }));
 
-  // Check that option names are rendered
-  expect(screen.getByText('Opt A')).toBeInTheDocument();
-  expect(screen.getByText('Opt B')).toBeInTheDocument();
+  // Check that option codes are rendered
+  expect(screen.getByText(/Option A/)).toBeInTheDocument();
+  expect(screen.getByText(/Option B/)).toBeInTheDocument();
 
   // Click "View Roadmap" for first option
   const roadmapButtons = screen.getAllByText('View Roadmap');
   fireEvent.click(roadmapButtons[0]);
 
-  // Check that timeline appears with year headers
-  expect(screen.getByText('Year 1')).toBeInTheDocument();
-  expect(screen.getByText('Year 5')).toBeInTheDocument();
+  // Check that timeline appears with year headers (should use plain English titles now)
+  expect(screen.getByText(/Year 1:/)).toBeInTheDocument();
+  expect(screen.getByText(/Year 5:/)).toBeInTheDocument();
 });
 
-test('toggles decision trace visibility', () => {
+test('toggles technical details visibility in roadmap', () => {
   const advice = {
     path: 'starter',
-    options: [],
+    options: [{ code: 'Option A', name: 'Test Option' }],
+    roadmap: { years: ['Test year 1', 'Test year 2'] },
     decisionTrace: [{ rule: 'testRule', evaluatedTo: true, details: 'test detail' }],
   };
 
   render(React.createElement(AdvisorHub, { inputs: {}, calc: {}, advice }));
 
-  const traceButton = screen.getByText(/Decision Trace/);
-  expect(screen.queryByText('test detail')).not.toBeInTheDocument();
+  // Open the roadmap first
+  const roadmapButtons = screen.getAllByText('View Roadmap');
+  fireEvent.click(roadmapButtons[0]);
 
-  fireEvent.click(traceButton);
-  expect(screen.getByText('test detail')).toBeInTheDocument();
+  // The technical details button should appear in the roadmap
+  const technicalButton = screen.getByText(/Show technical rationale/);
+  expect(screen.queryByText('testRule')).not.toBeInTheDocument();
+
+  // Click to expand technical details
+  fireEvent.click(technicalButton);
+  expect(screen.getByText('testRule')).toBeInTheDocument();
 });
 
 test('dispatchesсобытия on Estimate Cost click', () => {

@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/formatting';
+import { summarizeOption, plainRoadmapFromTemplate, humanizeDecisionTrace } from '@/lib/textHelpers';
 import CostEstimateModal from './CostEstimateModal';
 import SimulationPanel from './SimulationPanel';
 import { runSimulation } from '@/helpers/simulation';
@@ -25,8 +26,7 @@ export default function AdvisorHub({
 }) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showTimeline, setShowTimeline] = useState(false);
-  const [showTrace, setShowTrace] = useState(false);
-  const [simulateOption, setSimulateOption] = useState<string | null>(null);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [showCostEstimate, setShowCostEstimate] = useState(false);
   const [costEstimateOption, setCostEstimateOption] = useState<string | null>(null);
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
@@ -108,53 +108,60 @@ export default function AdvisorHub({
       <div className="mt-4 overflow-x-auto">
         <div className="flex gap-4 pb-2">
           {(advice.options || []).map((opt: any) => {
-            const rec =
-              (advice.recommendedProducts || []).find(
-                (r: any) =>
-                  (r.name || '').includes(opt.name || '') ||
-                  (opt.name || '').includes(r.name || '')
-              ) || {};
+            const recs = advice.recommendedProducts || [];
+            // Match by code first (Option A, B, C, D), then fall back to name matching
+            const rec = recs.find(
+              (r: any) =>
+                r.code === opt.code ||
+                (r.name || '').includes(opt.name || '') ||
+                (opt.name || '').includes(r.name || '')
+            ) || {};
+
+            // Use the text helper to generate customer-friendly content
+            const { title, summary, bullets } = summarizeOption(opt, [rec], []);
 
             return (
               <article
                 key={opt.code}
                 role="article"
                 aria-label={`Option ${opt.code}`}
-                className="min-w-[280px] p-4 border rounded hover:shadow-md transition"
+                className="min-w-[320px] p-4 border rounded hover:shadow-md transition"
               >
-                {/* Header: Code & Confidence */}
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <div className="inline-block px-2 py-1 bg-gray-100 text-xs font-bold rounded mb-1">
-                      {opt.code}
-                    </div>
-                    <div className="text-sm font-medium text-gray-800">
-                      {opt.name}
-                    </div>
+                {/* New: Customer-friendly title from helper */}
+                <div className="mb-3">
+                  <div className="text-sm font-bold text-blue-700 mb-1">
+                    {title}
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs text-gray-500">Confidence</div>
-                    <div className="text-sm font-semibold text-gray-900">
-                      {rec.confidence ?? '—'}
-                      {rec.confidence ? '%' : ''}
-                    </div>
+                  <div className="text-sm text-gray-700">
+                    {summary}
                   </div>
                 </div>
 
-                {/* Rationale */}
-                <div className="mt-2 text-sm text-gray-700">
-                  {rec.rationale || opt.name}
+                {/* New: Three short bullets */}
+                <div className="mt-3 space-y-2 mb-4">
+                  {bullets.map((bullet: string, idx: number) => (
+                    <div key={idx} className="text-xs text-gray-600">
+                      <span className="font-semibold">{bullet.split(':')[0]}:</span>
+                      {' '}
+                      {bullet.split(':').slice(1).join(':').trim()}
+                    </div>
+                  ))}
                 </div>
 
-                {/* Cost Avoided */}
-                {rec.estAnnualCostAvoided ? (
-                  <div className="mt-2 text-sm font-medium" style={{ color: '#00B388' }}>
-                    Est. annual saved: {formatCurrency(rec.estAnnualCostAvoided)}
+                {/* Confidence badge and cost (legacy, kept for context) */}
+                <div className="mb-4 pb-4 border-b">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500">Confidence: {rec.confidence ?? '—'}%</span>
+                    {rec.estAnnualCostAvoided ? (
+                      <span style={{ color: '#00B388' }} className="font-semibold">
+                        Saves {formatCurrency(rec.estAnnualCostAvoided)}/yr
+                      </span>
+                    ) : null}
                   </div>
-                ) : null}
+                </div>
 
                 {/* Action Buttons */}
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex gap-2 flex-wrap">
                   <button
                     onClick={() => {
                       setSelectedOption(opt.code);
@@ -204,43 +211,63 @@ export default function AdvisorHub({
               ✕
             </button>
           </div>
-          <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
-            {(advice.roadmap?.years || []).map((y: string, i: number) => (
-              <div key={i} className="min-w-[200px] p-3 border rounded bg-gray-50">
-                <div className="font-semibold text-sm">Year {i + 1}</div>
-                <div className="text-sm text-gray-700 mt-1">{y}</div>
+
+          {/* New: Plain-English roadmap years with action items */}
+          <div className="mt-4 space-y-3">
+            {plainRoadmapFromTemplate(advice.roadmap).map((yearData: any) => (
+              <div key={yearData.year} className="p-3 border rounded bg-blue-50">
+                <div className="font-semibold text-sm text-blue-900 mb-2">
+                  {yearData.title}
+                </div>
+                <ul className="space-y-1">
+                  {yearData.items.map((item: string, itemIdx: number) => (
+                    <li key={itemIdx} className="text-sm text-gray-700 ml-4">
+                      • {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
-        </div>
-      )}
 
-      {/* Decision Trace */}
-      {(advice.decisionTrace || []).length > 0 && (
-        <div className="mt-6 p-4 border-t">
-          <button
-            onClick={() => setShowTrace(!showTrace)}
-            aria-expanded={showTrace}
-            aria-label="Toggle decision trace visibility"
-            className="text-sm font-medium text-blue-600 hover:text-blue-800"
-          >
-            {showTrace ? '▼' : '▶'} Decision Trace
-          </button>
-          {showTrace && (
-            <div className="mt-3 space-y-2">
-              {advice.decisionTrace.map((trace: any, i: number) => (
-                <div key={i} className="p-2 bg-gray-50 rounded text-xs">
-                  <div className="font-semibold">{trace.rule}</div>
-                  <div className="text-gray-600">
-                    Evaluated to: <strong>{String(trace.evaluatedTo)}</strong>
-                  </div>
-                  {trace.details && (
-                    <div className="text-gray-600 mt-1">Details: {trace.details}</div>
+          {/* Why we recommended this */}
+          <div className="mt-6 pt-4 border-t">
+            <div className="prose prose-sm max-w-none mb-4">
+              <h4 className="text-sm font-semibold mb-2">Why we recommended this path</h4>
+              <p className="text-sm text-gray-700 mb-3">
+                {humanizeDecisionTrace(advice.decisionTrace).paragraph}
+              </p>
+            </div>
+
+            {/* Collapsible Technical Details */}
+            <button
+              onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+              aria-expanded={showTechnicalDetails}
+              className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            >
+              {showTechnicalDetails ? '▼' : '▶'} Show technical rationale
+            </button>
+
+            {showTechnicalDetails && (
+              <div className="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
+                <div className="text-xs font-mono space-y-2">
+                  {humanizeDecisionTrace(advice.decisionTrace).technical.map(
+                    (trace: any, idx: number) => (
+                      <div key={idx} className="border-b pb-2 last:border-b-0">
+                        <div className="font-semibold text-gray-800">{trace.rule}</div>
+                        <div className="text-gray-600">
+                          Evaluated: <span className="font-semibold">{String(trace.evaluatedTo)}</span>
+                        </div>
+                        {trace.details && (
+                          <div className="text-gray-600 mt-1">Details: {trace.details}</div>
+                        )}
+                      </div>
+                    )
                   )}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
