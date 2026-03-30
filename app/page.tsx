@@ -7,26 +7,26 @@ import AdvisorHub from '../components/AdvisorHub'
 import AssumptionsDrawer from '../components/AssumptionsDrawer'
 import PdfExportButton from '../components/PdfExportButton'
 
-const SAMPLE = {
-  annualRevenue: 100000000,
-  lostRevenuePerHour: 10000,
-  targetRTO: 4,
-  targetRPO: 4,
-  dataFootprintTB: 100,
+const EMPTY = {
+  annualRevenue: null,
+  lostRevenuePerHour: null,
+  targetRTO: null,
+  targetRPO: null,
+  dataFootprintTB: null,
   industry: 'other',
-  hasVMs: true,
-  vmCount: 50,
-  missionCriticalVmCount: 10,
+  hasVMs: false,
+  vmCount: null,
+  missionCriticalVmCount: null,
   requiresImmutability: false,
   requiresAirGap: false,
-  hoursDowntime: 1,
-  pctRevenueImpacted: 10,
-  employees: 1000,
-  avgHourlySalary: 50
+  hoursDowntime: null,
+  pctRevenueImpacted: null,
+  employees: null,
+  avgHourlySalary: null,
 }
 
 export default function Page() {
-  const [inputs, setInputs] = useState<any>(SAMPLE)
+  const [inputs, setInputs] = useState<any>(EMPTY)
   const [calc, setCalc] = useState<any>(null)
   const [advisor, setAdvisor] = useState<any>(null)
   const [overrides, setOverrides] = useState<any>({})

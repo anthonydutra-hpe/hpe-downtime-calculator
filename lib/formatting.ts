@@ -1,8 +1,8 @@
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
+export function formatCurrency(n?: number | null): string {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  return Number(n).toLocaleString('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value);
+  });
 }

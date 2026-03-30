@@ -1,6 +1,19 @@
 'use client'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import React from 'react'
+import { formatCurrency } from '@/lib/formatting'
+
+const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: any[] }) => {
+  if (active && payload && payload.length) {
+    const { total, hours } = payload[0].payload
+    return (
+      <div className="bg-white p-2 border border-gray-300 rounded shadow">
+        <p className="text-sm">{hours} hrs: {formatCurrency(total)}</p>
+      </div>
+    )
+  }
+  return null
+}
 
 export default function SensitivityChart({ inputs, calc, onChange }: any) {
   if (!calc) return null
@@ -16,8 +29,8 @@ export default function SensitivityChart({ inputs, calc, onChange }: any) {
         <ResponsiveContainer>
           <LineChart data={data}>
             <XAxis dataKey="hours" />
-            <YAxis />
-            <Tooltip />
+            <YAxis tickFormatter={(value) => formatCurrency(value).slice(0, -3)} />
+            <Tooltip content={<CustomTooltip />} />
             <Line type="monotone" dataKey="total" stroke="#00B388" />
           </LineChart>
         </ResponsiveContainer>
